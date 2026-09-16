@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: energy-monitor
+  namespace: energy-monitor
+  labels:
+    app: energy-monitor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: energy-monitor
+  template:
+    metadata:
+      labels:
+        app: energy-monitor
+    spec:
+      containers:
+        - name: energy-monitor
+          image: navi/energy-monitor:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi

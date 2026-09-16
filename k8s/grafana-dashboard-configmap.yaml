@@ -1,0 +1,81 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: energy-monitor-dashboard
+  namespace: energy-monitor
+  labels:
+    # Picked up automatically by the existing Grafana sidecar (grafana-sc-dashboard)
+    # in the metrics namespace, which watches every namespace for this label.
+    grafana_dashboard: "1"
+data:
+  energy-monitor.json: |
+    {
+      "title": "Energy Monitor (Rainforest EAGLE)",
+      "uid": "energy-monitor",
+      "schemaVersion": 39,
+      "timezone": "browser",
+      "time": { "from": "now-6h", "to": "now" },
+      "refresh": "30s",
+      "panels": [
+        {
+          "id": 1,
+          "title": "Demand (W)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 0 },
+          "datasource": { "type": "prometheus" },
+          "targets": [
+            {
+              "expr": "eagle_demand_watts",
+              "legendFormat": "Demand",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "title": "Cumulative Energy (kWh)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+          "datasource": { "type": "prometheus" },
+          "targets": [
+            {
+              "expr": "eagle_summation_delivered_kwh",
+              "legendFormat": "Delivered",
+              "refId": "A"
+            },
+            {
+              "expr": "eagle_summation_received_kwh",
+              "legendFormat": "Received",
+              "refId": "B"
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "title": "Seconds Since Last Upload",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 24, "x": 0, "y": 16 },
+          "datasource": { "type": "prometheus" },
+          "targets": [
+            {
+              "expr": "time() - eagle_last_upload_timestamp_seconds",
+              "legendFormat": "Staleness",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 120 },
+                  { "color": "red", "value": 300 }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    }

@@ -1,0 +1,20 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: energy-monitor
+  namespace: energy-monitor
+  labels:
+    app: energy-monitor
+    # Required: matches the existing Prometheus CR's serviceMonitorSelector
+    # (release=prometheus) in the `metrics` namespace. Its
+    # serviceMonitorNamespaceSelector is empty, so it already watches every
+    # namespace - no extra RBAC/selector wiring needed here.
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: energy-monitor
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s

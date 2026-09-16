@@ -136,6 +136,51 @@ data:
               "refId": "A"
             }
           ]
+        },
+        {
+          "id": 8,
+          "title": "Cost Today ($)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 8, "x": 0, "y": 40 },
+          "datasource": { "type": "prometheus", "uid": "dfye7iqan06ioe" },
+          "targets": [
+            {
+              "expr": "increase(eagle_cost_accrued_dollars[1d])",
+              "legendFormat": "Today",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "currencyUSD", "decimals": 2 } }
+        },
+        {
+          "id": 9,
+          "title": "Cost This Week ($)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 8, "x": 8, "y": 40 },
+          "datasource": { "type": "prometheus", "uid": "dfye7iqan06ioe" },
+          "targets": [
+            {
+              "expr": "increase(eagle_cost_accrued_dollars[7d])",
+              "legendFormat": "This week",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "currencyUSD", "decimals": 2 } }
+        },
+        {
+          "id": 10,
+          "title": "Cost This Month ($)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 8, "x": 16, "y": 40 },
+          "datasource": { "type": "prometheus", "uid": "dfye7iqan06ioe" },
+          "targets": [
+            {
+              "expr": "increase(eagle_cost_accrued_dollars[30d])",
+              "legendFormat": "This month",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "currencyUSD", "decimals": 2 } }
         }
       ]
     }

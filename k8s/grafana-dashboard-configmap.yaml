@@ -112,7 +112,7 @@ data:
           "title": "Daily Consumption, Long Term (kWh/day)",
           "type": "timeseries",
           "gridPos": { "h": 8, "w": 24, "x": 0, "y": 24 },
-          "datasource": { "type": "prometheus", "uid": "energy-monitor-longterm" },
+          "datasource": { "type": "prometheus", "uid": "dfye7iqan06ioe" },
           "description": "Widen the dashboard time range to see multiple months/years — this panel reads from the dedicated long-retention Prometheus instance, not the cluster's main one.",
           "targets": [
             {
@@ -127,7 +127,7 @@ data:
           "title": "Cost Accrued, Long Term ($)",
           "type": "timeseries",
           "gridPos": { "h": 8, "w": 24, "x": 0, "y": 32 },
-          "datasource": { "type": "prometheus", "uid": "energy-monitor-longterm" },
+          "datasource": { "type": "prometheus", "uid": "dfye7iqan06ioe" },
           "description": "Widen the dashboard time range to see multiple months/years — this panel reads from the dedicated long-retention Prometheus instance, not the cluster's main one.",
           "targets": [
             {

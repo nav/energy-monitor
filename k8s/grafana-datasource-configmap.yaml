@@ -4,15 +4,20 @@ metadata:
   name: energy-monitor-longterm-datasource
   namespace: energy-monitor
   labels:
-    # Picked up automatically by the existing Grafana sidecar (grafana-sc-datasources)
-    # in the metrics namespace, which watches every namespace for this label.
+    # Picked up automatically by the existing Grafana sidecar (grafana-sc-datasources) in
+    # the metrics namespace, which watches every namespace for this label. NOTE: as of
+    # 2026-09-16 that sidecar has a startup race that can wedge its watch loop before it
+    # ever reaches this ConfigMap (see git log) — the datasource was added manually via
+    # the Grafana UI in the meantime, with Grafana-assigned uid dfye7iqan06ioe. The uid
+    # below is pinned to match that so if the sidecar ever does pick this up, it converges
+    # on the same datasource entry instead of creating a duplicate.
     grafana_datasource: "1"
 data:
   energy-monitor-longterm.yaml: |
     apiVersion: 1
     datasources:
       - name: Energy Monitor (Long Term)
-        uid: energy-monitor-longterm
+        uid: dfye7iqan06ioe
         type: prometheus
         access: proxy
         url: http://energy-monitor-longterm-prometheus.energy-monitor.svc.cluster.local:9090

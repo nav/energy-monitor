@@ -7,7 +7,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/nav/energy-monitor/internal/eagle"
@@ -86,10 +85,6 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, "failed to read body", http.StatusBadRequest)
 		return
-	}
-
-	if os.Getenv("LOG_UPLOAD_PAYLOADS") == "true" {
-		log.Printf("eagle: raw upload payload: %s", body)
 	}
 
 	rf, err := eagle.Parse(body)

@@ -32,6 +32,15 @@ def reset_config():
 
 
 def connect_sta(ssid, password, timeout=15):
+    # ESP8266's WiFi mode (STA/AP/STA+AP) persists in flash across reboots,
+    # independent of what this script does -- if the board last left off in
+    # setup mode (AP active), it silently comes back up still advertising
+    # the setup AP on the next boot even though we're about to connect as a
+    # station. Explicitly force it off here rather than relying on it
+    # already being off.
+    ap = network.WLAN(network.AP_IF)
+    ap.active(False)
+
     sta = network.WLAN(network.STA_IF)
     sta.active(True)
     sta.connect(ssid, password)

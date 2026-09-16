@@ -20,6 +20,8 @@ nix-shell
 
 Run this once per terminal session before using any command below, or prefix each command with `nix-shell --run "..."`.
 
+A `Makefile` wraps the common operations below (`make deploy`, `make run`, `make repl`, `make reset`, `make ls`, `make font ...`, `make flash-firmware CONFIRM=1`) — it auto-detects `/dev/cu.usbserial-*` (override with `PORT=...`) and already wraps everything in `nix-shell --run` for you. Run `make help` for the full list. The rest of this doc spells out what those targets actually do.
+
 ## Editing and running code
 
 Scripts live in `src/`. Edit a file, then run it directly on the board without copying it first:
@@ -45,7 +47,11 @@ mpremote connect /dev/cu.usbserial-210 fs cp src/qr_url.py :qr_url.py
 mpremote connect /dev/cu.usbserial-210 fs cp src/freesansbold40.py :freesansbold40.py
 mpremote connect /dev/cu.usbserial-210 fs cp src/power_api.py :power_api.py
 mpremote connect /dev/cu.usbserial-210 fs cp src/energy_slides.py :energy_slides.py
+mpremote connect /dev/cu.usbserial-210 fs cp src/checkmark_anim.py :checkmark_anim.py
+mpremote connect /dev/cu.usbserial-210 fs cp src/checkmark_anim.bin :checkmark_anim.bin
 ```
+
+(`make deploy` does all of the above, plus a `reset` at the end.)
 
 Re-run the relevant line any time you change that file. List what's currently on the board with:
 
@@ -86,6 +92,7 @@ Ctrl-] to exit. (Remember: connecting resets the board.)
 - **Read the full request before parsing** — a single `recv()` call can return a partial request (headers arrive before the POST body on a slow AP link). `_recv_request()` accumulates until `\r\n\r\n`, then reads exactly `Content-Length` more bytes.
 - **Accepted sockets inherit the listening socket's `settimeout()`** — since the AP-detection loop needs `srv.settimeout(1)` to poll periodically, every accepted connection was *also* getting a 1s timeout, causing real (slightly slow) requests to fail with `ETIMEDOUT`. Fix: call `conn.settimeout(5)` right after `accept()`.
 - **ESP8266's WiFi SDK auto-reconnects STA using previously-saved credentials the instant the STA interface is activated** — completely independent of what's in `wifi.json`. We originally scanned for nearby networks (to populate a `<datalist>` in the form) by flipping STA on, which silently triggered this auto-reconnect and destabilized the AP (ESP8266 can't run AP+STA on independent channels — STA forces the AP onto its own channel). **Fix applied: dropped the network-scan feature entirely** and made `start_ap()` explicitly `sta.disconnect(); sta.active(False)` before bringing up the AP, so STA is never touched during setup mode.
+- **The board kept advertising the setup AP (`Energy Monitor`) even after successfully connecting to WiFi.** Cause: the ESP8266 WiFi SDK persists its interface mode (STA/AP/STA+AP) in flash across reboots, independent of this code — if the board last rebooted out of setup mode (AP active, e.g. mid-portal), the SDK brings the AP back up on the next boot before `main.py`'s own logic runs, and nothing in the normal `wifi.json`-found path ever turned it back off. **Fix applied**: `connect_sta()` now explicitly calls `network.WLAN(network.AP_IF).active(False)` before activating STA, rather than assuming the AP is already off.
 - Debugging note: any diagnostic `mpremote exec` you run to "just check state" will interrupt whatever's currently running on the board (see note above) — this cost significant time when a perfectly-working portal was mistaken for broken because checking on it killed it.
 
 ### Factory reset
@@ -119,6 +126,8 @@ Once WiFi connects, `energy_slides.run(oled, wri)` (called from `main.py`, reusi
 
 Titles use `freesans14` (regular weight) via `writer.py`'s `Writer`, not the built-in `oled.text()` bitmap font — the built-in 8x8 font has no antialiasing, so at this size it reads noticeably bolder/blockier than actual bold text.
 
+To cut power draw, the screen sits at the SSD1306's lowest contrast setting, 0 (`DIM_CONTRAST`), and briefly steps up to 80% (`BRIGHT_CONTRAST`) for 30s every 5 minutes (`BRIGHT_INTERVAL_MS`/`BRIGHT_DURATION_MS`), via `oled.contrast()`. This only affects `energy_slides.py`'s home-screen loop — the setup wizard, QR screens, and connected-animation run at the driver's default full contrast.
+
 Data comes from `src/power_api.py`, which does a hand-rolled raw-socket `GET` (no `urequests` — keeps the same zero-dependency approach as `wifi_manager.py`'s server side) against a fixed local endpoint (`HOST`/`PORT`/`PATH` constants at the top of the file), polled once a minute (`POLL_INTERVAL_MS`). Each poll appends to a 60-point ring buffer (`history`, one point/minute = 1 hour) that feeds the history slide; a failed poll just logs and keeps showing the last-known values rather than crashing the loop.
 
 The big-number font (`src/freesansbold40.py`) is FreeSansBold at 40px, generated with a **digit-only charset** (`-c '0123456789.'`) — see "Generating a different font size" below. Restricting the charset like this instead of the full ASCII set keeps a 40px bold font's *source* to ~9KB instead of ~18KB+ (though the resident cost of any of these fonts is much smaller than the source file size suggests — see gotcha below). As a side effect it also makes every glyph width fixed (29px/digit, 13px for `.`), which `format_big()` in `energy_slides.py` relies on to guarantee output never exceeds 3 significant digits — the one width that's provably safe to center on a 128px-wide screen with this font (4 digits measures 129px and would silently drop the overhanging character).
@@ -150,7 +159,7 @@ FONT_PATH=$(find /nix/store -maxdepth 1 -iname '*freefont-ttf*' ! -name '*.drv' 
 python3 tools_font_to_py.py "$FONT_PATH" <height_px> src/freesans<height_px>.py
 ```
 
-Then update the `import freesansNN` line in your script and copy the new font file to the board as above.
+Then update the `import freesansNN` line in your script and copy the new font file to the board as above. (`make font HEIGHT=<px> OUT=src/freesans<px>.py [CHARSET=<chars>]` does the same thing.)
 
 The same font directory also has `FreeSansBold.ttf` (and Mono/Serif + oblique/bold variants) — swap it in for bold text. For a large font that's only ever going to render a handful of characters (digits for a numeric readout, say), restrict the charset with `-c`: `python3 tools_font_to_py.py "$FONT_PATH" 40 src/foo.py -c '0123456789.'` generates only those glyphs, which is the difference between a 40px font costing ~9KB vs ~18KB+ for the full ASCII set — worth doing any time you don't need every character. See `src/freesansbold40.py` (used by the energy slides, below) for an example.
 

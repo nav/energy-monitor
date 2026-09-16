@@ -107,3 +107,66 @@ func TestParse_InvalidXML(t *testing.T) {
 		t.Fatal("expected error for invalid XML, got nil")
 	}
 }
+
+// Fixture captured live from a real Rainforest RFA-Z109 EAGLE upload.
+const priceClusterFixture = `<?xml version="1.0"?>
+<rainforest macId="0xd8d5b90019dc" version="undefined" timestamp="1789531271s">
+<PriceCluster>
+  <DeviceMacId>0xd8d5b900000032a1</DeviceMacId>
+  <MeterMacId>0x0007810000b3b716</MeterMacId>
+  <TimeStamp>0xffffffff</TimeStamp>
+  <Price>0x00000449</Price>
+  <Currency>0x007c</Currency>
+  <TrailingDigits>0x04</TrailingDigits>
+  <Tier>0x01</Tier>
+  <StartTime>0xffffffff</StartTime>
+  <Duration>0xffff</Duration>
+  <RateLabel>Block 1</RateLabel>
+  <Port>/dev/ttySP0</Port>
+</PriceCluster>
+
+</rainforest>`
+
+func TestParse_PriceCluster(t *testing.T) {
+	rf, err := Parse([]byte(priceClusterFixture))
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+	if rf.PriceCluster == nil {
+		t.Fatal("expected PriceCluster fragment, got nil")
+	}
+
+	price, err := rf.PriceCluster.PricePerUnit()
+	if err != nil {
+		t.Fatalf("PricePerUnit() error = %v", err)
+	}
+	if want := 0.1097; price != want {
+		t.Errorf("PricePerUnit() = %v, want %v", price, want)
+	}
+
+	if got, want := rf.PriceCluster.CurrencyName(), "CAD"; got != want {
+		t.Errorf("CurrencyName() = %q, want %q", got, want)
+	}
+
+	if got, want := rf.PriceCluster.RateLabel, "Block 1"; got != want {
+		t.Errorf("RateLabel = %q, want %q", got, want)
+	}
+}
+
+func TestPriceCluster_CurrencyName_UnknownCodeFallsBackToNumeric(t *testing.T) {
+	p := &PriceCluster{Currency: "0x0001"}
+	if got, want := p.CurrencyName(), "1"; got != want {
+		t.Errorf("CurrencyName() = %q, want %q", got, want)
+	}
+}
+
+func TestPriceCluster_PricePerUnit_ZeroTrailingDigits(t *testing.T) {
+	p := &PriceCluster{Price: "0x0000000A", TrailingDigits: "0x00"}
+	price, err := p.PricePerUnit()
+	if err != nil {
+		t.Fatalf("PricePerUnit() error = %v", err)
+	}
+	if want := 10.0; price != want {
+		t.Errorf("PricePerUnit() = %v, want %v", price, want)
+	}
+}

@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/nav/energy-monitor/internal/eagle"
@@ -23,6 +24,8 @@ type Server struct {
 	demandGauge     prometheus.Gauge
 	deliveredGauge  prometheus.Gauge
 	receivedGauge   prometheus.Gauge
+	priceGauge      prometheus.Gauge
+	costGauge       prometheus.Gauge
 	lastUploadGauge prometheus.Gauge
 }
 
@@ -45,13 +48,21 @@ func New(st *store.Store) *Server {
 			Name: "eagle_summation_received_kwh",
 			Help: "Cumulative energy received from the user by the utility (e.g. solar export), in kWh.",
 		}),
+		priceGauge: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "eagle_price_per_kwh",
+			Help: "Current price per kWh reported by the meter, in the meter's currency.",
+		}),
+		costGauge: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "eagle_cost_accrued_dollars",
+			Help: "Running total cost of delivered energy, priced at the rate in effect at the time of each delivered-kWh increase.",
+		}),
 		lastUploadGauge: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "eagle_last_upload_timestamp_seconds",
 			Help: "Unix timestamp of the last successfully decoded upload from the EAGLE.",
 		}),
 	}
 
-	registry.MustRegister(s.demandGauge, s.deliveredGauge, s.receivedGauge, s.lastUploadGauge)
+	registry.MustRegister(s.demandGauge, s.deliveredGauge, s.receivedGauge, s.priceGauge, s.costGauge, s.lastUploadGauge)
 	return s
 }
 
@@ -75,6 +86,10 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, "failed to read body", http.StatusBadRequest)
 		return
+	}
+
+	if os.Getenv("LOG_UPLOAD_PAYLOADS") == "true" {
+		log.Printf("eagle: raw upload payload: %s", body)
 	}
 
 	rf, err := eagle.Parse(body)
@@ -106,6 +121,18 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 			s.store.SetSummation(delivered, received, now)
 			s.deliveredGauge.Set(delivered)
 			s.receivedGauge.Set(received)
+			s.costGauge.Set(s.store.Latest().CostDollars)
+			s.lastUploadGauge.Set(float64(now.Unix()))
+		}
+	}
+
+	if rf.PriceCluster != nil {
+		price, err := rf.PriceCluster.PricePerUnit()
+		if err != nil {
+			log.Printf("eagle: failed to decode price: %v", err)
+		} else {
+			s.store.SetPrice(price, rf.PriceCluster.CurrencyName(), rf.PriceCluster.RateLabel, now)
+			s.priceGauge.Set(price)
 			s.lastUploadGauge.Set(float64(now.Unix()))
 		}
 	}
@@ -117,6 +144,10 @@ type currentResponse struct {
 	Watts        float64 `json:"watts"`
 	KWhDelivered float64 `json:"kwh_delivered"`
 	KWhReceived  float64 `json:"kwh_received"`
+	PricePerKWh  float64 `json:"price_per_kwh"`
+	Currency     string  `json:"currency"`
+	RateLabel    string  `json:"rate_label"`
+	CostDollars  float64 `json:"cost_dollars"`
 	UpdatedAt    string  `json:"updated_at"`
 }
 
@@ -126,6 +157,10 @@ func (s *Server) handleCurrent(w http.ResponseWriter, r *http.Request) {
 		Watts:        reading.Watts,
 		KWhDelivered: reading.KWhDelivered,
 		KWhReceived:  reading.KWhReceived,
+		PricePerKWh:  reading.PricePerKWh,
+		Currency:     reading.Currency,
+		RateLabel:    reading.RateLabel,
+		CostDollars:  reading.CostDollars,
 	}
 	if !reading.UpdatedAt.IsZero() {
 		resp.UpdatedAt = reading.UpdatedAt.UTC().Format(time.RFC3339)

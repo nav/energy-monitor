@@ -13,13 +13,23 @@ type Reading struct {
 	Watts        float64
 	KWhDelivered float64
 	KWhReceived  float64
-	UpdatedAt    time.Time
+	PricePerKWh  float64
+	Currency     string
+	RateLabel    string
+	// CostDollars accrues delivered-kWh deltas at the price known at the time of each
+	// delta. It is only an in-memory running total (reset on process restart); Prometheus's
+	// own counter-reset handling in rate()/increase() reconstructs the correct total across
+	// restarts as long as a scrape lands close to the restart.
+	CostDollars float64
+	UpdatedAt   time.Time
 }
 
 // Store is a mutex-protected cache of the latest Reading.
 type Store struct {
-	mu      sync.RWMutex
-	reading Reading
+	mu               sync.RWMutex
+	reading          Reading
+	prevKWhDelivered float64
+	haveKWhDelivered bool
 }
 
 // New returns an empty Store.
@@ -28,7 +38,7 @@ func New() *Store {
 }
 
 // SetDemand records a new instantaneous demand reading without disturbing previously
-// recorded summation values.
+// recorded summation or price values.
 func (s *Store) SetDemand(watts float64, at time.Time) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -37,12 +47,36 @@ func (s *Store) SetDemand(watts float64, at time.Time) {
 }
 
 // SetSummation records new cumulative summation readings without disturbing the
-// previously recorded demand value.
+// previously recorded demand or price values. If a prior delivered-kWh reading is known,
+// the increase is costed at the currently known price and added to CostDollars. The first
+// reading ever received only establishes a baseline (no prior value to diff against), and
+// a decrease (e.g. a meter reset) is ignored rather than treated as negative cost.
 func (s *Store) SetSummation(deliveredKWh, receivedKWh float64, at time.Time) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	if s.haveKWhDelivered {
+		delta := deliveredKWh - s.prevKWhDelivered
+		if delta > 0 && s.reading.PricePerKWh > 0 {
+			s.reading.CostDollars += delta * s.reading.PricePerKWh
+		}
+	}
+	s.prevKWhDelivered = deliveredKWh
+	s.haveKWhDelivered = true
+
 	s.reading.KWhDelivered = deliveredKWh
 	s.reading.KWhReceived = receivedKWh
+	s.reading.UpdatedAt = at
+}
+
+// SetPrice records the current price without disturbing previously recorded demand or
+// summation values.
+func (s *Store) SetPrice(pricePerKWh float64, currency, rateLabel string, at time.Time) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.reading.PricePerKWh = pricePerKWh
+	s.reading.Currency = currency
+	s.reading.RateLabel = rateLabel
 	s.reading.UpdatedAt = at
 }
 

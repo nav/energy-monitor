@@ -5,6 +5,7 @@ package eagle
 import (
 	"encoding/xml"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 )
@@ -16,6 +17,7 @@ type Rainforest struct {
 	Timestamp                 string                     `xml:"timestamp,attr"`
 	InstantaneousDemand       *InstantaneousDemand       `xml:"InstantaneousDemand"`
 	CurrentSummationDelivered *CurrentSummationDelivered `xml:"CurrentSummationDelivered"`
+	PriceCluster              *PriceCluster              `xml:"PriceCluster"`
 }
 
 // Parse decodes a raw EAGLE upload body. The device sends `Content-Type:
@@ -93,6 +95,55 @@ func (s *CurrentSummationDelivered) decode(rawHex string) (float64, error) {
 		return 0, fmt.Errorf("divisor: %w", err)
 	}
 	return float64(raw) * mult / div, nil
+}
+
+// PriceCluster is the current price in effect on the meter (or a user-defined price set
+// directly on the EAGLE).
+type PriceCluster struct {
+	DeviceMacId    string `xml:"DeviceMacId"`
+	MeterMacId     string `xml:"MeterMacId"`
+	Price          string `xml:"Price"`
+	Currency       string `xml:"Currency"`
+	TrailingDigits string `xml:"TrailingDigits"`
+	Tier           string `xml:"Tier"`
+	RateLabel      string `xml:"RateLabel"`
+}
+
+// isoCurrencyNames maps a subset of ISO 4217 numeric currency codes to their common
+// three-letter names, for display purposes only.
+var isoCurrencyNames = map[uint64]string{
+	840: "USD",
+	124: "CAD",
+	978: "EUR",
+	826: "GBP",
+	036: "AUD",
+}
+
+// PricePerUnit decodes the current price: value = raw / 10^TrailingDigits.
+func (p *PriceCluster) PricePerUnit() (float64, error) {
+	raw, err := parseHexUint(p.Price)
+	if err != nil {
+		return 0, fmt.Errorf("price: %w", err)
+	}
+	digits, err := parseHexUint(p.TrailingDigits)
+	if err != nil {
+		return 0, fmt.Errorf("trailingDigits: %w", err)
+	}
+	return float64(raw) / math.Pow(10, float64(digits)), nil
+}
+
+// CurrencyName returns the common three-letter name for the ISO 4217 numeric currency
+// code, or the raw numeric code as a string if it isn't one of the common currencies this
+// package recognizes.
+func (p *PriceCluster) CurrencyName() string {
+	code, err := parseHexUint(p.Currency)
+	if err != nil {
+		return p.Currency
+	}
+	if name, ok := isoCurrencyNames[code]; ok {
+		return name
+	}
+	return strconv.FormatUint(code, 10)
 }
 
 func parseHexUint(s string) (uint64, error) {

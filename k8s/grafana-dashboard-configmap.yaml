@@ -52,9 +52,39 @@ data:
         },
         {
           "id": 3,
+          "title": "Current Price",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 12, "x": 0, "y": 16 },
+          "datasource": { "type": "prometheus" },
+          "targets": [
+            {
+              "expr": "eagle_price_per_kwh",
+              "legendFormat": "{{currency}}/kWh",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": { "defaults": { "decimals": 4 } }
+        },
+        {
+          "id": 4,
+          "title": "Estimated Cost Rate ($/hour)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 12, "x": 12, "y": 16 },
+          "datasource": { "type": "prometheus" },
+          "targets": [
+            {
+              "expr": "eagle_price_per_kwh * eagle_demand_watts / 1000",
+              "legendFormat": "Cost/hour at current demand",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": { "defaults": { "decimals": 3 } }
+        },
+        {
+          "id": 5,
           "title": "Seconds Since Last Upload",
           "type": "stat",
-          "gridPos": { "h": 4, "w": 24, "x": 0, "y": 16 },
+          "gridPos": { "h": 4, "w": 24, "x": 0, "y": 20 },
           "datasource": { "type": "prometheus" },
           "targets": [
             {
@@ -76,6 +106,36 @@ data:
               }
             }
           }
+        },
+        {
+          "id": 6,
+          "title": "Daily Consumption, Long Term (kWh/day)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 24 },
+          "datasource": { "type": "prometheus", "uid": "energy-monitor-longterm" },
+          "description": "Widen the dashboard time range to see multiple months/years — this panel reads from the dedicated long-retention Prometheus instance, not the cluster's main one.",
+          "targets": [
+            {
+              "expr": "increase(eagle_summation_delivered_kwh[1d])",
+              "legendFormat": "Delivered / day",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 7,
+          "title": "Cost Accrued, Long Term ($)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 32 },
+          "datasource": { "type": "prometheus", "uid": "energy-monitor-longterm" },
+          "description": "Widen the dashboard time range to see multiple months/years — this panel reads from the dedicated long-retention Prometheus instance, not the cluster's main one.",
+          "targets": [
+            {
+              "expr": "eagle_cost_accrued_dollars",
+              "legendFormat": "Cost accrued",
+              "refId": "A"
+            }
+          ]
         }
       ]
     }

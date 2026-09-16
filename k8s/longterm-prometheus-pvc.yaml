@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: energy-monitor-longterm-prometheus-data
+  namespace: energy-monitor
+spec:
+  # Small on purpose: this Prometheus only ever scrapes our ~6 energy-monitor series, so
+  # even multi-year retention stays in the tens of MB. Uses the cluster's default
+  # "local-path" StorageClass, so data is durable across pod restarts/reschedules on the
+  # same node (unlike emptyDir), though not across node loss.
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi

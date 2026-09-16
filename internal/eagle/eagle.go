@@ -41,9 +41,11 @@ type InstantaneousDemand struct {
 	Divisor     string `xml:"Divisor"`
 }
 
-// Watts decodes the demand reading: value = raw * multiplier / divisor, per the manual
-// (a multiplier or divisor of 0 is treated as 1). Demand is a 24-bit signed integer.
-func (d *InstantaneousDemand) Watts() (float64, error) {
+// KW decodes the demand reading, in kilowatts: value = raw * multiplier / divisor, per
+// the manual's own worked example ("5944 x 1 / 1000 = 5.944 kWh", i.e. kW - the manual's
+// unit label there is a typo, since demand is a power reading, not an energy one). A
+// multiplier or divisor of 0 is treated as 1. Demand is a 24-bit signed integer.
+func (d *InstantaneousDemand) KW() (float64, error) {
 	raw, err := parseSigned24Hex(d.Demand)
 	if err != nil {
 		return 0, fmt.Errorf("demand: %w", err)

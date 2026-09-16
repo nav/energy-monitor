@@ -19,13 +19,14 @@ data:
       "panels": [
         {
           "id": 1,
-          "title": "Demand (W)",
+          "title": "Demand (kW)",
           "type": "timeseries",
           "gridPos": { "h": 8, "w": 24, "x": 0, "y": 0 },
           "datasource": { "type": "prometheus" },
+          "description": "Wrapped in sum() to collapse the separate series Prometheus otherwise keeps per pod/instance across redeploys — without it, every restart adds another duplicate legend entry.",
           "targets": [
             {
-              "expr": "eagle_demand_watts",
+              "expr": "sum(eagle_demand_kw)",
               "legendFormat": "Demand",
               "refId": "A"
             }
@@ -39,12 +40,12 @@ data:
           "datasource": { "type": "prometheus" },
           "targets": [
             {
-              "expr": "eagle_summation_delivered_kwh",
+              "expr": "sum(eagle_summation_delivered_kwh)",
               "legendFormat": "Delivered",
               "refId": "A"
             },
             {
-              "expr": "eagle_summation_received_kwh",
+              "expr": "sum(eagle_summation_received_kwh)",
               "legendFormat": "Received",
               "refId": "B"
             }
@@ -58,8 +59,8 @@ data:
           "datasource": { "type": "prometheus" },
           "targets": [
             {
-              "expr": "eagle_price_per_kwh",
-              "legendFormat": "{{currency}}/kWh",
+              "expr": "sum(eagle_price_per_kwh)",
+              "legendFormat": "Price/kWh",
               "refId": "A"
             }
           ],
@@ -73,7 +74,7 @@ data:
           "datasource": { "type": "prometheus" },
           "targets": [
             {
-              "expr": "eagle_price_per_kwh * eagle_demand_watts / 1000",
+              "expr": "sum(eagle_price_per_kwh * eagle_demand_kw)",
               "legendFormat": "Cost/hour at current demand",
               "refId": "A"
             }
@@ -88,7 +89,7 @@ data:
           "datasource": { "type": "prometheus" },
           "targets": [
             {
-              "expr": "time() - eagle_last_upload_timestamp_seconds",
+              "expr": "time() - sum(eagle_last_upload_timestamp_seconds)",
               "legendFormat": "Staleness",
               "refId": "A"
             }
@@ -116,7 +117,7 @@ data:
           "description": "Widen the dashboard time range to see multiple months/years — this panel reads from the dedicated long-retention Prometheus instance, not the cluster's main one.",
           "targets": [
             {
-              "expr": "increase(eagle_summation_delivered_kwh[1d])",
+              "expr": "sum(increase(eagle_summation_delivered_kwh[1d]))",
               "legendFormat": "Delivered / day",
               "refId": "A"
             }
@@ -131,7 +132,7 @@ data:
           "description": "Widen the dashboard time range to see multiple months/years — this panel reads from the dedicated long-retention Prometheus instance, not the cluster's main one.",
           "targets": [
             {
-              "expr": "eagle_cost_accrued_dollars",
+              "expr": "sum(eagle_cost_accrued_dollars)",
               "legendFormat": "Cost accrued",
               "refId": "A"
             }
@@ -145,7 +146,7 @@ data:
           "datasource": { "type": "prometheus", "uid": "dfye7iqan06ioe" },
           "targets": [
             {
-              "expr": "increase(eagle_cost_accrued_dollars[1d])",
+              "expr": "sum(increase(eagle_cost_accrued_dollars[1d]))",
               "legendFormat": "Today",
               "refId": "A"
             }
@@ -160,7 +161,7 @@ data:
           "datasource": { "type": "prometheus", "uid": "dfye7iqan06ioe" },
           "targets": [
             {
-              "expr": "increase(eagle_cost_accrued_dollars[7d])",
+              "expr": "sum(increase(eagle_cost_accrued_dollars[7d]))",
               "legendFormat": "This week",
               "refId": "A"
             }
@@ -175,7 +176,7 @@ data:
           "datasource": { "type": "prometheus", "uid": "dfye7iqan06ioe" },
           "targets": [
             {
-              "expr": "increase(eagle_cost_accrued_dollars[30d])",
+              "expr": "sum(increase(eagle_cost_accrued_dollars[30d]))",
               "legendFormat": "This month",
               "refId": "A"
             }

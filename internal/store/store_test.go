@@ -12,8 +12,8 @@ func TestStore_LatestReflectsSetDemand(t *testing.T) {
 	s.SetDemand(5.944, now)
 
 	got := s.Latest()
-	if got.Watts != 5.944 {
-		t.Errorf("Watts = %v, want 5.944", got.Watts)
+	if got.KW != 5.944 {
+		t.Errorf("KW = %v, want 5.944", got.KW)
 	}
 	if !got.UpdatedAt.Equal(now) {
 		t.Errorf("UpdatedAt = %v, want %v", got.UpdatedAt, now)
@@ -29,8 +29,8 @@ func TestStore_SetSummationDoesNotClearDemand(t *testing.T) {
 	s.SetSummation(90, 0.01, t2)
 
 	got := s.Latest()
-	if got.Watts != 5.944 {
-		t.Errorf("Watts = %v, want 5.944 to be preserved after SetSummation", got.Watts)
+	if got.KW != 5.944 {
+		t.Errorf("KW = %v, want 5.944 to be preserved after SetSummation", got.KW)
 	}
 	if got.KWhDelivered != 90 {
 		t.Errorf("KWhDelivered = %v, want 90", got.KWhDelivered)
@@ -46,7 +46,7 @@ func TestStore_SetSummationDoesNotClearDemand(t *testing.T) {
 func TestStore_LatestBeforeAnyUpdateIsZeroValue(t *testing.T) {
 	s := New()
 	got := s.Latest()
-	if got.Watts != 0 || got.KWhDelivered != 0 || got.KWhReceived != 0 {
+	if got.KW != 0 || got.KWhDelivered != 0 || got.KWhReceived != 0 {
 		t.Errorf("Latest() = %+v, want zero-value reading", got)
 	}
 	if !got.UpdatedAt.IsZero() {
@@ -63,7 +63,7 @@ func TestStore_SetPriceDoesNotClearDemandOrSummation(t *testing.T) {
 	s.SetPrice(0.1097, "CAD", "Block 1", now)
 
 	got := s.Latest()
-	if got.Watts != 5.944 || got.KWhDelivered != 90 || got.KWhReceived != 0.01 {
+	if got.KW != 5.944 || got.KWhDelivered != 90 || got.KWhReceived != 0.01 {
 		t.Errorf("Latest() = %+v, want demand/summation preserved after SetPrice", got)
 	}
 	if got.PricePerKWh != 0.1097 || got.Currency != "CAD" || got.RateLabel != "Block 1" {

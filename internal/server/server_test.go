@@ -48,15 +48,15 @@ func TestHandleUpload_UpdatesCurrentAndMetrics(t *testing.T) {
 	if currentRec.Code != http.StatusOK {
 		t.Fatalf("/current status = %d, want 200", currentRec.Code)
 	}
-	if !strings.Contains(currentRec.Body.String(), `"watts":5.944`) {
-		t.Errorf("/current body = %s, want it to contain watts:5.944", currentRec.Body.String())
+	if !strings.Contains(currentRec.Body.String(), `"kw":5.944`) {
+		t.Errorf("/current body = %s, want it to contain kw:5.944", currentRec.Body.String())
 	}
 
 	metricsReq := httptest.NewRequest(http.MethodGet, "/metrics", nil)
 	metricsRec := httptest.NewRecorder()
 	h.ServeHTTP(metricsRec, metricsReq)
-	if !strings.Contains(metricsRec.Body.String(), "eagle_demand_watts 5.944") {
-		t.Errorf("/metrics body missing eagle_demand_watts 5.944, got:\n%s", metricsRec.Body.String())
+	if !strings.Contains(metricsRec.Body.String(), "eagle_demand_kw 5.944") {
+		t.Errorf("/metrics body missing eagle_demand_kw 5.944, got:\n%s", metricsRec.Body.String())
 	}
 }
 
@@ -156,8 +156,8 @@ func TestHandleCurrent_NoDataYet(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", rec.Code)
 	}
-	if !strings.Contains(rec.Body.String(), `"watts":0`) {
-		t.Errorf("body = %s, want zero-value watts before any upload", rec.Body.String())
+	if !strings.Contains(rec.Body.String(), `"kw":0`) {
+		t.Errorf("body = %s, want zero-value kw before any upload", rec.Body.String())
 	}
 	if !strings.Contains(rec.Body.String(), `"updated_at":""`) {
 		t.Errorf("body = %s, want empty updated_at before any upload", rec.Body.String())

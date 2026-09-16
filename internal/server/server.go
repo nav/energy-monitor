@@ -36,8 +36,8 @@ func New(st *store.Store) *Server {
 		store:    st,
 		registry: registry,
 		demandGauge: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: "eagle_demand_watts",
-			Help: "Current instantaneous demand reported by the EAGLE, in watts.",
+			Name: "eagle_demand_kw",
+			Help: "Current instantaneous demand reported by the EAGLE, in kilowatts.",
 		}),
 		deliveredGauge: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "eagle_summation_delivered_kwh",
@@ -97,12 +97,12 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 
 	if rf.InstantaneousDemand != nil {
-		watts, err := rf.InstantaneousDemand.Watts()
+		kw, err := rf.InstantaneousDemand.KW()
 		if err != nil {
 			log.Printf("eagle: failed to decode demand: %v", err)
 		} else {
-			s.store.SetDemand(watts, now)
-			s.demandGauge.Set(watts)
+			s.store.SetDemand(kw, now)
+			s.demandGauge.Set(kw)
 			s.lastUploadGauge.Set(float64(now.Unix()))
 		}
 	}
@@ -136,7 +136,7 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 }
 
 type currentResponse struct {
-	Watts        float64 `json:"watts"`
+	KW           float64 `json:"kw"`
 	KWhDelivered float64 `json:"kwh_delivered"`
 	KWhReceived  float64 `json:"kwh_received"`
 	PricePerKWh  float64 `json:"price_per_kwh"`
@@ -149,7 +149,7 @@ type currentResponse struct {
 func (s *Server) handleCurrent(w http.ResponseWriter, r *http.Request) {
 	reading := s.store.Latest()
 	resp := currentResponse{
-		Watts:        reading.Watts,
+		KW:           reading.KW,
 		KWhDelivered: reading.KWhDelivered,
 		KWhReceived:  reading.KWhReceived,
 		PricePerKWh:  reading.PricePerKWh,

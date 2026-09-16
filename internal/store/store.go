@@ -10,7 +10,7 @@ import (
 // Reading is the latest known values from the EAGLE. Zero-value fields mean no reading
 // of that kind has been received yet.
 type Reading struct {
-	Watts        float64
+	KW           float64
 	KWhDelivered float64
 	KWhReceived  float64
 	PricePerKWh  float64
@@ -37,12 +37,12 @@ func New() *Store {
 	return &Store{}
 }
 
-// SetDemand records a new instantaneous demand reading without disturbing previously
-// recorded summation or price values.
-func (s *Store) SetDemand(watts float64, at time.Time) {
+// SetDemand records a new instantaneous demand reading (in kW) without disturbing
+// previously recorded summation or price values.
+func (s *Store) SetDemand(kw float64, at time.Time) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.reading.Watts = watts
+	s.reading.KW = kw
 	s.reading.UpdatedAt = at
 }
 

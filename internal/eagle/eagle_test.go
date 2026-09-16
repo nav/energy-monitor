@@ -28,35 +28,35 @@ func TestParse_InstantaneousDemand(t *testing.T) {
 		t.Fatal("expected InstantaneousDemand fragment, got nil")
 	}
 
-	watts, err := rf.InstantaneousDemand.Watts()
+	kw, err := rf.InstantaneousDemand.KW()
 	if err != nil {
-		t.Fatalf("Watts() error = %v", err)
+		t.Fatalf("KW() error = %v", err)
 	}
-	if want := 5.944; watts != want {
-		t.Errorf("Watts() = %v, want %v", watts, want)
+	if want := 5.944; kw != want {
+		t.Errorf("KW() = %v, want %v", kw, want)
 	}
 }
 
 func TestInstantaneousDemand_NegativeDemand(t *testing.T) {
 	// 0xFFFFFF is -1 as a 24-bit signed integer (two's complement).
 	d := &InstantaneousDemand{Demand: "0xFFFFFF", Multiplier: "0x00000001", Divisor: "0x00000001"}
-	watts, err := d.Watts()
+	kw, err := d.KW()
 	if err != nil {
-		t.Fatalf("Watts() error = %v", err)
+		t.Fatalf("KW() error = %v", err)
 	}
-	if want := -1.0; watts != want {
-		t.Errorf("Watts() = %v, want %v", watts, want)
+	if want := -1.0; kw != want {
+		t.Errorf("KW() = %v, want %v", kw, want)
 	}
 }
 
 func TestInstantaneousDemand_ZeroMultiplierDivisorTreatedAsOne(t *testing.T) {
 	d := &InstantaneousDemand{Demand: "0x00000A", Multiplier: "0x00000000", Divisor: "0x00000000"}
-	watts, err := d.Watts()
+	kw, err := d.KW()
 	if err != nil {
-		t.Fatalf("Watts() error = %v", err)
+		t.Fatalf("KW() error = %v", err)
 	}
-	if want := 10.0; watts != want {
-		t.Errorf("Watts() = %v, want %v", watts, want)
+	if want := 10.0; kw != want {
+		t.Errorf("KW() = %v, want %v", kw, want)
 	}
 }
 

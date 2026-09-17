@@ -2,7 +2,8 @@ import gc
 import time
 from micropython import const
 from writer import Writer
-import freesansbold40
+import berkeley40
+import history_chart
 import power_api
 
 # Same 128x64 dual-color split documented in the README (top 16 rows
@@ -50,11 +51,11 @@ def _set_bright(oled):
     oled.contrast(BRIGHT_CONTRAST)
 
 
-# freesansbold40 is digit/period-only (see "Generating a different font
-# size" in README) -- every digit glyph in it is exactly 29px wide and '.'
-# is 13px, so a string's rendered width is fully predictable: 29*ndigits +
-# 13*ndots. format_big() relies on that to guarantee at most 3 digits
-# (<=100px), which always fits centered on the 128px-wide screen.
+# berkeley40 is digit/period-only (see "Generating a different font size"
+# in README) -- BerkeleyMono is a true monospace face, so every glyph in
+# it, including '.', is exactly 25px wide: a string's rendered width is
+# always 25*len(s). format_big() relies on that to guarantee at most 3
+# characters (<=75px), which always fits centered on the 128px-wide screen.
 def format_big(value):
     if value >= 100:
         s = str(round(value))
@@ -68,10 +69,10 @@ def format_big(value):
 
 
 def _draw_title(oled, wri, title):
-    # freesans14 (regular weight) instead of the built-in bitmap font --
+    # berkeley (regular weight) instead of the built-in bitmap font --
     # the built-in 8x8 font renders every pixel solid black/white with no
     # antialiasing, which at this size reads as much bolder/blockier than
-    # an actual bold font. freesans14 is thinner and more legible.
+    # an actual bold font. berkeley is thinner and more legible.
     Writer.set_textpos(oled, 0, 0)
     wri.printstring(title)
 
@@ -80,31 +81,12 @@ def _draw_big_number(oled, wri, wri_big, title, value_str):
     oled.fill(0)
     _draw_title(oled, wri, title)
 
-    w = sum(freesansbold40.get_ch(c)[2] for c in value_str)
+    w = sum(berkeley40.get_ch(c)[2] for c in value_str)
     x = max(0, (128 - w) // 2)
-    y = BLUE_ZONE_TOP + (BODY_H - freesansbold40.height()) // 2
+    y = BLUE_ZONE_TOP + (BODY_H - berkeley40.height()) // 2
     Writer.set_textpos(oled, y, x)
     wri_big.printstring(value_str)
     oled.show()
-
-
-def _draw_line_chart(oled, values, x, y, w, h, vmin):
-    n = len(values)
-    if n < 2:
-        return
-    vmax = max(values)
-    vrange = vmax - vmin or 1
-
-    def point(i):
-        px = x + round(i * (w - 1) / (n - 1))
-        py = y + h - 1 - round((values[i] - vmin) * (h - 1) / vrange)
-        return px, py
-
-    prev = point(0)
-    for i in range(1, n):
-        cur = point(i)
-        oled.line(prev[0], prev[1], cur[0], cur[1], 1)
-        prev = cur
 
 
 def _show_history_slide(oled, wri, history):
@@ -113,18 +95,18 @@ def _show_history_slide(oled, wri, history):
 
     # No x-axis tick labels -- the window is always exactly the last hour,
     # so that row is reclaimed for chart height instead.
-    label_w = 34  # fits "{:.1f}" labels (e.g. "23.4") at 8px/char
+    #
+    # label_w budgets for a 5-char "{:.1f}" label ("-12.4", "123.4"), not
+    # just the usual 4 ("23.4"): the EAGLE's demand reading is a signed
+    # value (see eagle.go), so a solar-export reading or a meter-resync
+    # glitch can legitimately land outside the usual 1-2-digit range. A
+    # label that overflows this column bleeds into the chart's own
+    # x-range -- right at the row the line's low point sits on, which
+    # reads as the line itself spilling past the chart's bottom edge.
+    label_w = 42  # 5 chars * 8px, plus the same 2px margin the old 4-char budget had
     x, y = label_w, BLUE_ZONE_TOP + 1
     w, h = 128 - label_w - 2, BODY_H - 2
-
-    # Fixed at 0 rather than min(history): demand doesn't go negative here,
-    # and an autoscaled floor exaggerates small fluctuations into a chart
-    # that looks like it's swinging wildly when it's actually +/- a few %.
-    vmin = 0
-    vmax = max(history)
-    oled.text("{:.1f}".format(vmax), 0, y)
-    oled.text("{:.1f}".format(vmin), 0, y + h - 8)
-    _draw_line_chart(oled, history, x, y, w, h, vmin)
+    history_chart.draw(oled, history, x, y, w, h)
     oled.show()
 
 
@@ -146,7 +128,7 @@ def run(oled, wri):
     _draw_title(oled, wri, "Fetching data...")
     oled.show()
 
-    wri_big = Writer(oled, freesansbold40)
+    wri_big = Writer(oled, berkeley40)
 
     latest = {"kw": 0.0, "cost": 0.0}
     history = [0.0] * HISTORY_POINTS

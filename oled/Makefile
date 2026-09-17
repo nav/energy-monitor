@@ -6,9 +6,10 @@ PORT ?= $(shell ls -t /dev/cu.usbserial-* 2>/dev/null | head -1)
 
 # Files main.py transitively imports -- must live on the board itself, not
 # just in src/ on this machine. Keep in sync with README.md's file list.
-FILES := main.py wifi_manager.py writer.py freesans14.py qr_draw.py \
-         qr_wifi.py qr_url.py freesansbold40.py power_api.py \
-         energy_slides.py checkmark_anim.py checkmark_anim.bin
+FILES := main.py wifi_manager.py writer.py qr_draw.py \
+         qr_wifi.py qr_url.py power_api.py \
+         energy_slides.py history_chart.py checkmark_anim.py checkmark_anim.bin \
+         berkeley.py berkeley40.py
 
 DEPLOY_CMD := $(foreach f,$(FILES),mpremote connect $(PORT) fs cp src/$(f) :$(f) &&) mpremote connect $(PORT) reset
 

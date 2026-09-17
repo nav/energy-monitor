@@ -3,7 +3,7 @@ import framebuf
 import time
 import ssd1306
 from writer import Writer
-import freesans14
+import berkeley
 import qr_draw
 import qr_wifi
 import qr_url
@@ -13,7 +13,7 @@ import energy_slides
 
 i2c = I2C(scl=Pin(12), sda=Pin(14), freq=400000)
 oled = ssd1306.SSD1306_I2C(128, 64, i2c)
-wri = Writer(oled, freesans14)
+wri = Writer(oled, berkeley)
 
 # Onboard FLASH button on GPIO0, pulled low when pressed. Only safe to read
 # once MicroPython is already running (GPIO0 low *during* power-on/reset
@@ -107,11 +107,15 @@ def show_connected_animation():
             # so framebuf.blit() converts it in C instead of a Python pixel
             # loop -- ~17x faster (4.7ms vs 79.5ms measured on this board).
             data = bytearray(f.read(frame_bytes))
-            frame = framebuf.FrameBuffer(data, checkmark_anim.WIDTH, checkmark_anim.HEIGHT, framebuf.MONO_HLSB)
+            frame = framebuf.FrameBuffer(
+                data, checkmark_anim.WIDTH, checkmark_anim.HEIGHT, framebuf.MONO_HLSB
+            )
             oled.fill_rect(x, ry0, rw, rh, 0)
             oled.blit(frame, x, y)
             show_region(oled, x, ry0, x1, ry1)
-            remaining = checkmark_anim.DURATIONS[i] - time.ticks_diff(time.ticks_ms(), t0)
+            remaining = checkmark_anim.DURATIONS[i] - time.ticks_diff(
+                time.ticks_ms(), t0
+            )
             if remaining > 0:
                 time.sleep_ms(remaining)
 
@@ -153,7 +157,11 @@ def check_factory_reset():
             pressed += 1
         time.sleep_ms(50)
     duty = pressed / samples
-    print("factory reset button: {}/{} samples low ({:.0%})".format(pressed, samples, duty))
+    print(
+        "factory reset button: {}/{} samples low ({:.0%})".format(
+            pressed, samples, duty
+        )
+    )
     return duty >= RESET_MIN_DUTY
 
 
@@ -172,7 +180,9 @@ def main():
         ip = wifi_manager.connect_sta(config["ssid"], config["password"])
         if ip:
             show_connected_animation()
-            energy_slides.run(oled, wri)  # never returns; this is the device's home screen
+            energy_slides.run(
+                oled, wri
+            )  # never returns; this is the device's home screen
 
     run_setup_mode()
 

@@ -11,6 +11,7 @@ import (
 
 	"github.com/nav/energy-monitor/internal/eagle"
 	"github.com/nav/energy-monitor/internal/store"
+	"github.com/nav/energy-monitor/internal/tou"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -49,7 +50,9 @@ func New(st *store.Store) *Server {
 		}),
 		priceGauge: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "eagle_price_per_kwh",
-			Help: "Current price per kWh reported by the meter, in the meter's currency.",
+			Help: "Current price per kWh as reported by the meter's own PriceCluster upload. " +
+				"Informational only -- it does not reflect the utility's time-of-use " +
+				"adjustments, so it is not used to compute cost; see energy_tou_rate_dollars_per_kwh.",
 		}),
 		costGauge: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "eagle_cost_accrued_dollars",
@@ -61,7 +64,14 @@ func New(st *store.Store) *Server {
 		}),
 	}
 
-	registry.MustRegister(s.demandGauge, s.deliveredGauge, s.receivedGauge, s.priceGauge, s.costGauge, s.lastUploadGauge)
+	touRateGauge := prometheus.NewGaugeFunc(prometheus.GaugeOpts{
+		Name: "energy_tou_rate_dollars_per_kwh",
+		Help: "Dollars/kWh in effect right now per the utility's time-of-use schedule (package tou) -- the rate actually used to compute cost.",
+	}, func() float64 {
+		return tou.RatePerKWh(time.Now())
+	})
+
+	registry.MustRegister(s.demandGauge, s.deliveredGauge, s.receivedGauge, s.priceGauge, s.costGauge, s.lastUploadGauge, touRateGauge)
 	return s
 }
 

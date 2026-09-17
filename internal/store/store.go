@@ -5,6 +5,8 @@ package store
 import (
 	"sync"
 	"time"
+
+	"github.com/nav/energy-monitor/internal/tou"
 )
 
 // Reading is the latest known values from the EAGLE. Zero-value fields mean no reading
@@ -13,13 +15,17 @@ type Reading struct {
 	KW           float64
 	KWhDelivered float64
 	KWhReceived  float64
-	PricePerKWh  float64
-	Currency     string
-	RateLabel    string
-	// CostDollars accrues delivered-kWh deltas at the price known at the time of each
-	// delta. It is only an in-memory running total (reset on process restart); Prometheus's
-	// own counter-reset handling in rate()/increase() reconstructs the correct total across
-	// restarts as long as a scrape lands close to the restart.
+	// PricePerKWh, Currency and RateLabel are the EAGLE's own reported PriceCluster
+	// values. They're informational only -- the device's reported price does not reflect
+	// the utility's time-of-use adjustments (see package tou), so CostDollars below is
+	// costed independently rather than from this field.
+	PricePerKWh float64
+	Currency    string
+	RateLabel   string
+	// CostDollars accrues delivered-kWh deltas at the tou.RatePerKWh in effect at the time
+	// of each delta. It is only an in-memory running total (reset on process restart);
+	// Prometheus's own counter-reset handling in rate()/increase() reconstructs the correct
+	// total across restarts as long as a scrape lands close to the restart.
 	CostDollars float64
 	UpdatedAt   time.Time
 }
@@ -48,17 +54,19 @@ func (s *Store) SetDemand(kw float64, at time.Time) {
 
 // SetSummation records new cumulative summation readings without disturbing the
 // previously recorded demand or price values. If a prior delivered-kWh reading is known,
-// the increase is costed at the currently known price and added to CostDollars. The first
-// reading ever received only establishes a baseline (no prior value to diff against), and
-// a decrease (e.g. a meter reset) is ignored rather than treated as negative cost.
+// the increase is costed at tou.RatePerKWh(at) -- the utility's time-of-use rate for when
+// the usage occurred, not anything reported by the device -- and added to CostDollars.
+// The first reading ever received only establishes a baseline (no prior value to diff
+// against), and a decrease (e.g. a meter reset) is ignored rather than treated as negative
+// cost.
 func (s *Store) SetSummation(deliveredKWh, receivedKWh float64, at time.Time) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if s.haveKWhDelivered {
 		delta := deliveredKWh - s.prevKWhDelivered
-		if delta > 0 && s.reading.PricePerKWh > 0 {
-			s.reading.CostDollars += delta * s.reading.PricePerKWh
+		if delta > 0 {
+			s.reading.CostDollars += delta * tou.RatePerKWh(at)
 		}
 	}
 	s.prevKWhDelivered = deliveredKWh

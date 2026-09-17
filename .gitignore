@@ -32,6 +32,9 @@ go.work.sum
 # .idea/
 # .vscode/
 
+# macOS Finder metadata
+.DS_Store
+
 # Python bytecode cache (oled/ is MicroPython, not Go, but py_compile / running
 # scripts under a desktop Python still drops these locally)
 __pycache__/

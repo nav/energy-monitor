@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"time"
+	_ "time/tzdata" // embed the IANA database: the distroless base image has none on disk
 
 	"github.com/nav/energy-monitor/internal/server"
 	"github.com/nav/energy-monitor/internal/store"

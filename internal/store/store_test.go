@@ -3,6 +3,8 @@ package store
 import (
 	"testing"
 	"time"
+
+	"github.com/nav/energy-monitor/internal/tou"
 )
 
 func TestStore_LatestReflectsSetDemand(t *testing.T) {
@@ -71,38 +73,54 @@ func TestStore_SetPriceDoesNotClearDemandOrSummation(t *testing.T) {
 	}
 }
 
-func TestStore_CostAccruesOnSummationDeltaAtKnownPrice(t *testing.T) {
-	s := New()
-	t1 := time.Now()
+func TestStore_CostAccruesOnSummationDeltaAtTOURate(t *testing.T) {
+	// Noon: off-peak, no time-of-use adjustment on top of the base rate.
+	offPeak := time.Date(2024, 6, 15, 12, 0, 0, 0, tou.Location)
 
-	s.SetPrice(0.10, "CAD", "Block 1", t1)
-	s.SetSummation(100, 0, t1)                // first reading: establishes baseline, no cost yet
-	s.SetSummation(105, 0, t1.Add(time.Hour)) // +5 kWh at $0.10/kWh = $0.50
+	s := New()
+	s.SetSummation(100, 0, offPeak)                // first reading: establishes baseline, no cost yet
+	s.SetSummation(105, 0, offPeak.Add(time.Hour)) // +5 kWh at $0.1270/kWh = $0.635
 
 	got := s.Latest()
-	if want := 0.50; got.CostDollars != want {
+	if want := 0.635; got.CostDollars != want {
 		t.Errorf("CostDollars = %v, want %v", got.CostDollars, want)
 	}
 }
 
-func TestStore_CostDoesNotAccrueBeforePriceIsKnown(t *testing.T) {
-	s := New()
-	t1 := time.Now()
+func TestStore_CostAccruesAtTheRateInEffectWhenEachDeltaHappened(t *testing.T) {
+	overnight := time.Date(2024, 6, 15, 2, 0, 0, 0, tou.Location)
+	onPeak := time.Date(2024, 6, 15, 18, 0, 0, 0, tou.Location)
 
-	s.SetSummation(100, 0, t1)
-	s.SetSummation(105, 0, t1.Add(time.Hour)) // no price set yet
+	s := New()
+	s.SetSummation(100, 0, overnight)                // baseline
+	s.SetSummation(105, 0, overnight.Add(time.Hour)) // +5 kWh overnight at $0.0770/kWh = $0.385
+	s.SetSummation(110, 0, onPeak)                   // +5 kWh on-peak at $0.1770/kWh = $0.885
 
 	got := s.Latest()
-	if got.CostDollars != 0 {
-		t.Errorf("CostDollars = %v, want 0 when price was never set", got.CostDollars)
+	if want := 0.385 + 0.885; got.CostDollars != want {
+		t.Errorf("CostDollars = %v, want %v", got.CostDollars, want)
+	}
+}
+
+func TestStore_CostAccrualIgnoresDeviceReportedPrice(t *testing.T) {
+	offPeak := time.Date(2024, 6, 15, 12, 0, 0, 0, tou.Location)
+
+	s := New()
+	// A device-reported price wildly different from the TOU rate shouldn't affect cost.
+	s.SetPrice(9.99, "CAD", "Block 1", offPeak)
+	s.SetSummation(100, 0, offPeak)
+	s.SetSummation(105, 0, offPeak.Add(time.Hour))
+
+	got := s.Latest()
+	if want := 0.635; got.CostDollars != want {
+		t.Errorf("CostDollars = %v, want %v (device price should be ignored)", got.CostDollars, want)
 	}
 }
 
 func TestStore_CostDoesNotAccrueOnSummationDecrease(t *testing.T) {
-	s := New()
-	t1 := time.Now()
+	t1 := time.Date(2024, 6, 15, 12, 0, 0, 0, tou.Location)
 
-	s.SetPrice(0.10, "CAD", "Block 1", t1)
+	s := New()
 	s.SetSummation(100, 0, t1)
 	s.SetSummation(50, 0, t1.Add(time.Hour)) // meter reset/rollback: ignore, don't accrue negative cost
 

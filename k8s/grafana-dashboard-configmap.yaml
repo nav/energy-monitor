@@ -53,14 +53,15 @@ data:
         },
         {
           "id": 3,
-          "title": "Current Price",
+          "title": "Current TOU Rate ($/kWh)",
           "type": "stat",
           "gridPos": { "h": 4, "w": 12, "x": 0, "y": 16 },
           "datasource": { "type": "prometheus" },
+          "description": "The time-of-use rate actually used to compute cost (package tou) -- not the EAGLE's own reported eagle_price_per_kwh, which doesn't reflect the utility's time-of-use adjustments and is informational only.",
           "targets": [
             {
-              "expr": "sum(eagle_price_per_kwh)",
-              "legendFormat": "Price/kWh",
+              "expr": "sum(energy_tou_rate_dollars_per_kwh)",
+              "legendFormat": "TOU rate/kWh",
               "refId": "A"
             }
           ],
@@ -74,7 +75,7 @@ data:
           "datasource": { "type": "prometheus" },
           "targets": [
             {
-              "expr": "sum(eagle_price_per_kwh * eagle_demand_kw)",
+              "expr": "sum(energy_tou_rate_dollars_per_kwh * eagle_demand_kw)",
               "legendFormat": "Cost/hour at current demand",
               "refId": "A"
             }

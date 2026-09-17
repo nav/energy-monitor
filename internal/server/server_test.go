@@ -1,12 +1,15 @@
 package server
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nav/energy-monitor/internal/store"
+	"github.com/nav/energy-monitor/internal/tou"
 )
 
 const instantaneousDemandFixture = `<?xml version="1.0"?>
@@ -118,20 +121,61 @@ func TestHandleUpload_PriceCluster_UpdatesCurrentAndMetrics(t *testing.T) {
 	}
 }
 
-func TestHandleUpload_CostAccruesAcrossSummationUpdatesAtKnownPrice(t *testing.T) {
+func TestHandleUpload_CostAccruesAcrossSummationUpdatesAtTOURate(t *testing.T) {
 	s := New(store.New())
 	h := s.Routes()
 
-	postUpload(t, h, priceClusterFixture)            // $0.1097/kWh
+	// Posting a (deliberately wrong-looking) PriceCluster first shouldn't affect cost --
+	// see TestHandleUpload_CostAccrualIgnoresDeviceReportedPrice below for the explicit
+	// version of this check.
+	postUpload(t, h, priceClusterFixture)
 	postUpload(t, h, summationFixture("0x000186A0")) // 100000 raw / 1000 divisor = 100 kWh baseline
 	postUpload(t, h, summationFixture("0x0001D4C0")) // 120000 raw / 1000 divisor = 120 kWh (+20 kWh)
+
+	// handleUpload prices each delta at tou.RatePerKWh(time.Now()) internally, so the
+	// expected cost has to be computed the same way rather than hardcoded -- the actual
+	// rate depends on which TOU window the test happens to run in.
+	wantCost := 20.0 * tou.RatePerKWh(time.Now())
+	wantLine := fmt.Sprintf("eagle_cost_accrued_dollars %v", wantCost)
 
 	metricsReq := httptest.NewRequest(http.MethodGet, "/metrics", nil)
 	metricsRec := httptest.NewRecorder()
 	h.ServeHTTP(metricsRec, metricsReq)
-	// 20 kWh * $0.1097/kWh = $2.194
-	if !strings.Contains(metricsRec.Body.String(), "eagle_cost_accrued_dollars 2.194") {
-		t.Errorf("/metrics body missing eagle_cost_accrued_dollars 2.194, got:\n%s", metricsRec.Body.String())
+	if !strings.Contains(metricsRec.Body.String(), wantLine) {
+		t.Errorf("/metrics body missing %q, got:\n%s", wantLine, metricsRec.Body.String())
+	}
+}
+
+func TestHandleUpload_CostAccrualIgnoresDeviceReportedPrice(t *testing.T) {
+	withDevicePrice := New(store.New())
+	hWith := withDevicePrice.Routes()
+	postUpload(t, hWith, priceClusterFixture) // $0.1097/kWh -- should have no effect below
+	postUpload(t, hWith, summationFixture("0x000186A0"))
+	postUpload(t, hWith, summationFixture("0x0001D4C0"))
+
+	withoutDevicePrice := New(store.New())
+	hWithout := withoutDevicePrice.Routes()
+	postUpload(t, hWithout, summationFixture("0x000186A0"))
+	postUpload(t, hWithout, summationFixture("0x0001D4C0"))
+
+	got := withDevicePrice.store.Latest().CostDollars
+	want := withoutDevicePrice.store.Latest().CostDollars
+	if got != want {
+		t.Errorf("CostDollars with a PriceCluster upload = %v, want %v (same as without one)", got, want)
+	}
+}
+
+func TestHandleUpload_TOURateGaugeReflectsCurrentRate(t *testing.T) {
+	s := New(store.New())
+	h := s.Routes()
+
+	metricsReq := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	metricsRec := httptest.NewRecorder()
+	h.ServeHTTP(metricsRec, metricsReq)
+
+	wantLine := fmt.Sprintf("energy_tou_rate_dollars_per_kwh %v", tou.RatePerKWh(time.Now()))
+	if !strings.Contains(metricsRec.Body.String(), wantLine) {
+		t.Errorf("/metrics body missing %q, got:\n%s", wantLine, metricsRec.Body.String())
 	}
 }
 
